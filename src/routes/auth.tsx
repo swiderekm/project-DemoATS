@@ -10,10 +10,10 @@ export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Logga in | AtlasATS" },
-      { name: "description", content: "Logga in på AtlasATS för att hantera jobb och kandidater." },
-      { property: "og:title", content: "Logga in | AtlasATS" },
-      { property: "og:description", content: "Logga in på AtlasATS för att hantera jobb och kandidater." },
+      { title: "Logga in | DemoATS" },
+      { name: "description", content: "Logga in på DemoATS för att hantera jobb och kandidater." },
+      { property: "og:title", content: "Logga in | DemoATS" },
+      { property: "og:description", content: "Logga in på DemoATS för att hantera jobb och kandidater." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],

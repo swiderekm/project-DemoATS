@@ -80,12 +80,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "AtlasATS – mini-ATS för rekrytering" },
+      { title: "DemoATS – mini-ATS för rekrytering" },
       {
         name: "description",
         content: "Lägg upp jobb, samla kandidater och följ processen i en kompakt kanban-vy.",
       },
-      { property: "og:title", content: "AtlasATS – mini-ATS för rekrytering" },
+      { property: "og:title", content: "DemoATS – mini-ATS för rekrytering" },
       {
         property: "og:description",
         content: "Lägg upp jobb, samla kandidater och följ processen i en kompakt kanban-vy.",

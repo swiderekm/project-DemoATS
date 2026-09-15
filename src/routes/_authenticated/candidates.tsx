@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Linkedin, Pencil } from "lucide-react";
+import { Plus, Linkedin, Pencil, Trash2 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { useCandidates, useJobs } from "@/hooks/useAts";
 import { STAGES } from "@/lib/ats";
 import { CandidateDialog } from "@/components/CandidateDialog";
@@ -44,6 +47,7 @@ function Candidates() {
   const { data: jobs } = useJobs();
   const [jobFilter, setJobFilter] = useState("all");
   const [nameFilter, setNameFilter] = useState("");
+  const queryClient = useQueryClient();
 
   const jobById = useMemo(() => Object.fromEntries((jobs ?? []).map((j) => [j.id, j])), [jobs]);
   const rows = (candidates ?? []).filter(
@@ -51,6 +55,18 @@ function Candidates() {
       (jobFilter === "all" || c.job_id === jobFilter) &&
       c.full_name.toLowerCase().includes(nameFilter.trim().toLowerCase()),
   );
+
+  const remove = useMutation({
+    mutationFn: async (candidateId: string) => {
+      const { error } = await supabase.from("candidates").delete().eq("id", candidateId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Kandidaten togs bort");
+      queryClient.invalidateQueries({ queryKey: ["candidates"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <div className="space-y-6">
@@ -125,14 +141,28 @@ function Candidates() {
                   {c.email ?? c.phone ?? "—"}
                 </TableCell>
                 <TableCell className="text-right">
-                  <CandidateDialog
-                    candidate={c}
-                    trigger={
-                      <Button size="sm" variant="ghost">
-                        <Pencil className="size-4" />
-                      </Button>
-                    }
-                  />
+                  <div className="flex items-center justify-end gap-1">
+                    <CandidateDialog
+                      candidate={c}
+                      trigger={
+                        <Button size="sm" variant="ghost">
+                          <Pencil className="size-4" />
+                        </Button>
+                      }
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={remove.isPending}
+                      onClick={() => {
+                        if (confirm(`Ta bort ${c.full_name}? Detta går inte att ångra.`)) {
+                          remove.mutate(c.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
