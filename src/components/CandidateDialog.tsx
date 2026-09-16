@@ -54,6 +54,9 @@ export function CandidateDialog({
     mutationFn: async () => {
       const job = (jobs ?? []).find((j) => j.id === jobId);
       if (!job) throw new Error("Välj ett jobb först.");
+      if (!email.trim() && !phone.trim()) {
+        throw new Error("Ange minst e-post eller telefon.");
+      }
       const payload = {
         job_id: jobId,
         owner_id: job.owner_id,
