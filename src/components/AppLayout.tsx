@@ -1,10 +1,18 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { KanbanSquare, Briefcase, Users, LogOut, ShieldCheck } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 const links = [
@@ -18,8 +26,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   async function signOut() {
+    setLogoutOpen(false);
     await queryClient.cancelQueries();
     queryClient.clear();
     await supabase.auth.signOut();
@@ -67,7 +77,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <p className="px-3 text-xs opacity-70">{user?.isAdmin ? "Admin" : "Kund"}</p>
           <Button
             variant="ghost"
-            onClick={signOut}
+            onClick={() => setLogoutOpen(true)}
             className="mt-2 w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
           >
             <LogOut className="size-4" /> Logga ut
@@ -89,13 +99,40 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 <ShieldCheck className="size-4" />
               </Link>
             )}
-            <button onClick={signOut} className="rounded-md p-2 hover:bg-muted">
+            <button
+              onClick={() => setLogoutOpen(true)}
+              className="rounded-md p-2 hover:bg-muted"
+              aria-label="Logga ut"
+            >
               <LogOut className="size-4" />
             </button>
           </div>
         </header>
         <main className="min-w-0 flex-1 px-4 py-6 md:px-8">{children}</main>
       </div>
+
+      <Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-display">Logga ut?</DialogTitle>
+            <DialogDescription>
+              Du kommer att loggas ut från DemoATS och behöver logga in igen för att fortsätta.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setLogoutOpen(false)}
+              className="w-full sm:w-auto"
+            >
+              Avbryt
+            </Button>
+            <Button variant="destructive" onClick={signOut} className="w-full sm:w-auto">
+              Logga ut
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
