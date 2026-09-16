@@ -161,7 +161,7 @@ export function CandidateDialog({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="linkedin">LinkedIn-länk</Label>
+            <Label htmlFor="linkedin">LinkedIn eller annat</Label>
             <Input
               id="linkedin"
               placeholder="https://linkedin.com/in/…"
