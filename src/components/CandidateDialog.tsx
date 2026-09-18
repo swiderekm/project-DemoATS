@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { Plus, Upload, X } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { assessCv } from "@/lib/ai.functions";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useJobs } from "@/hooks/useAts";
 import { STAGES, type Candidate, type Stage } from "@/lib/ats";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +52,72 @@ export function CandidateDialog({
   const [currentTitle, setCurrentTitle] = useState(candidate?.current_title ?? "");
   const [notes, setNotes] = useState(candidate?.notes ?? "");
   const [stage, setStage] = useState<Stage>(candidate?.stage ?? "new");
+  const [cvText, setCvText] = useState("");
+  const [assessment, setAssessment] = useState("");
+  const [assessing, setAssessing] = useState(false);
+  const [fileName, setFileName] = useState("");
+  const [fileData, setFileData] = useState("");
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const runAssessCv = useServerFn(assessCv);
+
+  function readAsDataUrl(file: File) {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("Kunde inte läsa filen."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleFile(file: File) {
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("Filen är för stor (max 15 MB).");
+      return;
+    }
+    const isText =
+      file.type.startsWith("text/") || /\.(txt|md|csv)$/i.test(file.name);
+    if (isText) {
+      const text = await file.text();
+      setCvText(text.slice(0, 20000));
+      setFileName(file.name);
+      setFileData("");
+      return;
+    }
+    if (file.type === "application/pdf" || file.type.startsWith("image/")) {
+      setFileData(await readAsDataUrl(file));
+      setFileName(file.name);
+      return;
+    }
+    toast.error("Stödda filer: PDF, bild eller textfil.");
+  }
+
+  function clearFile() {
+    setFileName("");
+    setFileData("");
+  }
+
+  async function runAssessment() {
+    setAssessing(true);
+    try {
+      const job = (jobs ?? []).find((j) => j.id === jobId);
+      const result = await runAssessCv({
+        data: {
+          cvText,
+          fileName: fileName || undefined,
+          fileData: fileData || undefined,
+          jobTitle: job?.title,
+          jobDescription: job?.description ?? undefined,
+        },
+      });
+      setAssessment(result.assessment);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunde inte bedöma CV:t.");
+    } finally {
+      setAssessing(false);
+    }
+  }
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -190,6 +259,100 @@ export function CandidateDialog({
           <div className="space-y-2">
             <Label htmlFor="notes">Anteckningar</Label>
             <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="cv">CV-bedömning med AI</Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={assessing || (cvText.trim().length < 20 && !fileData)}
+                onClick={runAssessment}
+              >
+                {assessing ? "Bedömer…" : "Bedöm CV"}
+              </Button>
+            </div>
+
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) handleFile(file);
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click();
+              }}
+              className={cn(
+                "flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed p-4 text-center transition-colors",
+                dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
+              )}
+            >
+              <Upload className="size-5 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Släpp en fil här, eller klicka för att välja (PDF, bild eller textfil)
+              </p>
+              {fileName && (
+                <div
+                  className="mt-1 flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="max-w-[220px] truncate">{fileName}</span>
+                  <button
+                    type="button"
+                    onClick={clearFile}
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label="Ta bort fil"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.md,.csv,text/plain,application/pdf,image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
+                e.target.value = "";
+              }}
+            />
+
+            <Textarea
+              id="cv"
+              placeholder="…eller klistra in CV-text här"
+              value={cvText}
+              onChange={(e) => setCvText(e.target.value)}
+              rows={4}
+            />
+            {assessment && (
+              <div className="space-y-2">
+                <p className="whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">{assessment}</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    setNotes((n) => (n ? `${n}\n\nAI-bedömning:\n${assessment}` : `AI-bedömning:\n${assessment}`))
+                  }
+                >
+                  Spara i anteckningar
+                </Button>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="submit" disabled={mutation.isPending}>
